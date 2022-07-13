@@ -1,0 +1,45 @@
+# Version: v1.1.beta
+# Updated: 2022-07-13 23:12:00
+# Intro.: Please Insert ip_info func content to the end of basic security rules 
+# Usage: GET http://example.com/{ip1}/{ip2}/{ip3}/... -> Resp: json {"ip1": {'ip1_country','ip1_region', 'ip1_city', 'ip1_isp'}, ...}
+# Known Issues: No so accurate when meets with not-aliyun-IDC IPs
+# Example:  GET http://example.com/223.5.5.5/119.29.29.29/123.123.123.123 -> 
+# {
+#     "119.29.29.29": {
+#         "ip_isp": "1000401",
+#         "ip_region": "110000",
+#         "ip_city": "110100",
+#         "ip_country": "CN"
+#     },
+#     "223.5.5.5": {
+#         "ip_isp": "1000323",
+#         "ip_region": "330000",
+#         "ip_city": "330100",
+#         "ip_country": "CN"
+#     },
+#     "123.123.123.123": {
+#         "ip_isp": "100026",
+#         "ip_region": "110000",
+#         "ip_city": "110100",
+#         "ip_country": "CN"
+#     }
+# }
+
+
+# --------ADD FOLLOWING CONTENT TO THE END OF BASIC RULES----------
+_info = []
+def getCountry(k, v, u) {
+    _tmp = []
+    set(_tmp, 'ip_country', ip_country(v))
+    set(_tmp, 'ip_region', ip_region(v))
+    set(_tmp, 'ip_city', ip_city(v))
+    set(_tmp, 'ip_isp', ip_isp(v))
+    set(_info, v, _tmp)
+}
+def ip_info() {
+    segs = req_uri_seg()
+    foreach(segs, getCountry, [])
+    add_rsp_header('Content-Type', 'application/json')
+    exit(200, tostring(json_enc(_info)))
+}
+ip_info()

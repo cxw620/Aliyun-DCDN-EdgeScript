@@ -1,0 +1,56 @@
+# safety_rules_include_whitelist
+# Version: v4.1.beta
+# Updated: 2022-07-13 22:27:00
+# Intro.: Add Whitelist, Optimize performance.
+
+# ----------------------------VARIABLE-----------------------------
+# Whitelisted IP
+allow_ip = []
+# Fake Source IP
+fake_ip = ''
+# --------------------------VARIABLE END---------------------------
+# -------------------NO EDIT FOLLOWING CONTENT---------------------
+add_rsp_header('X-Client-Country', client_country())
+add_rsp_header('X-Client-IP', client_addr())
+add_rsp_header('X-Client-ISP', client_isp())
+
+
+# Block Func
+def block() {
+    if ne(client_country(),'CN') {
+        add_rsp_header('X-Client-Block', 'Blocked Client Country')
+        exit(403)
+    } else {
+        # 拦截代理
+        if req_header('x_forwarded_for') {
+            add_rsp_header('X-Client-Block', 'Block Proxied Request')
+            exit(403)
+        } else {
+            # ISP拦截
+            c_isp = tostring(client_isp())
+            isp_ct = '100017'
+            isp_cm = '100025'
+            isp_cu = '100026'
+            if not(or(eq(isp_cm,c_isp), eq(isp_cm,c_isp), eq(isp_cm,c_isp))) {
+                add_rsp_header('X-Client-Block', 'Blocked Client ISP')
+                exit(403)
+            }
+        }
+    }
+}
+
+# Whitelist Func
+w = false
+def whitelist(k, v, u) {
+    w = eq(v, client_addr())
+}
+# Main Func
+foreach(allow_ip, whitelist, [])
+if not(w) {
+    block()
+} else {
+    add_rsp_header('X-Client-Whitelisted', 'True')
+}
+if fake_ip {
+  add_req_header('x_forwarded_for', fake_ip)
+}

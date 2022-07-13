@@ -1,0 +1,53 @@
+# Version: v2.1(production)
+# Updated: 2022-07-13 23:30:00
+# Intro.: Tencent Cloud ECDN, D-key
+# Known Issues: None
+# Usage: 
+## Tencent Cloud CDN AuthenticationParams -> qcloud_key qcloud_ts
+### Authentication mode:         "TypeD"
+### Authentication key(main):    "******" (set one as you like)
+### Authentication key(backup):  "" (let blank)
+### Signature parameter:         "qcloud_key"
+### Timestamp parameter name:    "qcloud_ts"
+### Validity period:             "30 s"
+### Time format:                 "十进制（Unix 时间戳）"
+### Authentication scope:        "指定文件后缀鉴权"
+### File extension:              "所有文件"
+## Pay attention to the domain "bili-{area}.api.example.com"(See Line 49), please CHANGE to actual one.
+### Pseudo code: for area in ["cn", "hk", "tw", "th"]: "bili-{area}.api.example.com".format(area)
+# --------ADD FOLLOWING CONTENT TO THE END OF BASIC RULES----------
+## ---------------------------VARIABLE-----------------------------
+## Here's the filter for your public files. Please Change it according to the ACTUAL situation
+filter = 're:/(index\.html)|(blacklist\.html)|(more\.html)'
+## Tencent Cloud CDN Authentication Type-D Key
+pkey = 'tencentcdnhantong'
+## -------------------------VARIABLE END---------------------------
+## Classify Client
+if not(req_header('x_from_biliroaming')) {
+    if not(req_referer('re:bilibili')) {
+        if not(req_uri('/')) {
+            if not(req_uri(filter)) {
+                ## Not welcome invalid requests
+                exit(403)
+            }
+        }
+    }
+}
+## Additional Block, uncomment the following 3 lines if you need
+#if and(not(req_uri('/')), req_uri_arg('access_key', 're:79780ff658a94c54d476fbd80e07da71')) {
+#    exit(404)
+#}
+## Returns an accelerated link based on the requested region
+if not(req_uri(filter)) {
+    # Identify Area
+    area = req_uri_arg('area')
+    if not(area) {
+        area = 'hk'
+    }
+    cTs = tostring(time())
+    md5String = md5(concat(pkey, req_uri(), cTs))
+    ## Pay attention to the domain "bili-{area}.api.example.com", please CHANGE to actual one.
+    fullUrl = concat('https://bili-', area, '.api.example.com', req_uri(), '?', req_uri_query_string(), '&qcloud_key=', md5String, '&qcloud_ts=', cTs)
+    # add_rsp_header('x-redirect', fullUrl)
+    rewrite(fullUrl, 'enhance_redirect', 307)
+}

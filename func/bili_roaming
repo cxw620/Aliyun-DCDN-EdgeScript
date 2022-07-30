@@ -1,7 +1,7 @@
-# Version: v2.2(production)
-# Updated: 2022-07-17 15:30:00
-# Intro.: Tencent Cloud ECDN, D-key
-# Fixed: [Bug] Zone TH Failed to Search / Fetch playurl
+# Version: v3.0(production)
+# Updated: 2022-07-30 18:30:00
+# Intro.: Add Server Specified Func, usage: https://bili.api.example.com/cn-server/... => https://bili-cn.api.example.com/...
+# Fixed: None
 # Known Issues: None
 # Usage: 
 ## Tencent Cloud CDN AuthenticationParams -> qcloud_key qcloud_ts
@@ -14,7 +14,7 @@
 ### Time format:                 "十进制（Unix 时间戳）"
 ### Authentication scope:        "指定文件后缀鉴权"
 ### File extension:              "所有文件"
-## Pay attention to the domain "bili-{area}.api.example.com"(See Line 46), please CHANGE to actual one.
+## Pay attention to the domain "bili-{area}.api.example.com"(See Line 78), please CHANGE to actual one.
 ### Pseudo code: for area in ["cn", "hk", "tw", "th"]: "bili-{area}.api.example.com".format(area)
 # --------ADD FOLLOWING CONTENT TO THE END OF BASIC RULES----------
 ## ----------------------------MODULE------------------------------
@@ -24,39 +24,71 @@
 filter = 're:(^/$)|(^/index\.html$)|(^/blacklist\.html$)|(^/more\.html$)|(^/connection-test$)'
 ## Tencent Cloud CDN Authentication Type-D Key
 pkey = ''
+## Return Directly IP
+spt_ip = []
 ## -------------------------VARIABLE END---------------------------
+## -----------------------------FUNC-------------------------------
+# w = false
+# def determine_spt(k, v, u) {
+#     if w {
+#         # When w is already True then return directly
+#         add_rsp_header('Content-Type', 'application/json')
+#         var_resp_dict = []
+#         set(var_resp_dict, 'code', 0)
+#         set(var_resp_dict, 'message', '')
+#         exit(200, json_enc(var_resp_dict))
+#     } else {
+#         w = eq(v, c_ip)
+#     }
+# }
+# foreach(spt_ip, determine_spt, [])
+# if w {
+#     add_rsp_header('Content-Type', 'application/json')
+#     var_resp_dict = []
+#     set(var_resp_dict, 'code', 0)
+#     set(var_resp_dict, 'message', '')
+#     exit(200, json_enc(var_resp_dict))
+# }
+## ---------------------------FUNC END-----------------------------
 # Classify Client
 if not(req_header('x_from_biliroaming')) {
     if not(req_referer('re:bilibili')) {
         if not(req_uri(filter)) {
             ## Not welcome invalid requests
-            exit(403)
+            exit(401)
         }
     }
 }
 ## Additional Block, uncomment the following 3 lines if you need
 #if and(not(req_uri('/')), req_uri_arg('access_key', 're:79780ff658a94c54d476fbd80e07da71')) {
-#    exit(404)
+#    exit(401)
 #}
 ## Returns an accelerated link based on the requested region
 def redirectBili(area) {
-    add_rsp_header('X-Roaming-Area', area)
+    server_area = area
+    req_uri_text = req_uri()
+    if req_uri('re:^/cn-server') {
+        server_area = 'cn'
+        req_uri_text = substr(req_uri(), 11, -1)
+    }
+    # add_rsp_header('X-Roaming-Area', area)
+    # add_rsp_header('X-Roaming-Server-Area', server_area)
     cTs = tostring(time())
-    md5String = md5(concat(pkey, req_uri(), cTs))
-    fullUrl = concat('https://bili-', area, '.api.example.com', req_uri(), '?', req_uri_query_string(), '&qcloud_key=', md5String, '&qcloud_ts=', cTs)
+    md5String = md5(concat(pkey, req_uri_text, cTs))
+    fullUrl = concat('https://bili-', server_area, '.api.example.com', req_uri_text, '?', req_uri_query_string(), '&qcloud_key=', md5String, '&qcloud_ts=', cTs)
     rewrite(fullUrl, 'enhance_redirect', 307)
 }
 if not(req_uri(filter)) {
     # Identify Area
     area = req_uri_arg('area')
-    if or(eq(area, 'hk'), eq(area, 'tw')) {
+    if or(eq(area, 'hk'), eq(area, 'tw'), eq(area, 'cn')) {
         redirectBili(area)
     } else {
         if or(eq(req_uri_arg('c_locale'), 'zh_SG'), eq(req_uri_arg('s_locale'), 'zh_SG'), eq(area, 'th'), req_uri('re:^/intl.*')) {
             # Fix Zone TH Failed to Search / Fetch playurl
             redirectBili('th')
         }
-        # Invalid Req All feed 404
-        exit(404)
+        # Invalid Req All feed 401
+        exit(401)
     }
 }

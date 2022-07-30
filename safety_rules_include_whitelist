@@ -1,101 +1,86 @@
 # safety_rules_include_whitelist
-# Version: v4.6.production
-add_rsp_header('X-ES-Version', 'v4.6.production')
-# Updated: 2022-07-17 15:40:00
-# Intro.: None
-# Fixed: [Bug] Whitelist Error
-# Fixed: [Bug] ISP Block Func Error
+# Version: v5.2.production
+# add_rsp_header('X-ES-Version', 'v5.2.production')
+# Updated: 2022-07-30 18:15:00
+# Intro.: Optimized Whitelist Func, Block Func
 # Known Issues: None
 
 # ----------------------------VARIABLE-----------------------------
 # Whitelisted IP
-allow_ip = ['']
-# Fake Source IP
-fake_ip = ''
-# Debug
-debug_mode = false
+allow_ip = []
+# Fake Source IP, uncomment line 12, 82-85 if you need such func
+# fake_ip = ''
 # --------------------------VARIABLE END---------------------------
 
 # -------------------NO EDIT FOLLOWING CONTENT---------------------
 ## -----------------------------FUNC-------------------------------
 # Block Func
 def block_details() {
-    # For Debug Only
+    # For Debug Only. If you need to debug please change line 71 "block_easy()" to "block_details()"
     add_rsp_header('X-Client-Country', client_country())
     add_rsp_header('X-Client-IP', client_addr())
     add_rsp_header('X-Client-ISP', client_isp())
-    # ISP拦截
+    # Block some IDC's IP
     c_isp = tostring(client_isp())
     isp_ct = '100017'
     isp_cm = '100025'
     isp_cu = '100026'
     if not(or(eq(isp_cm,c_isp), eq(isp_ct,c_isp), eq(isp_cu,c_isp))) {
         add_rsp_header('X-Client-Block', 'Blocked Client ISP')
-        exit(403)
+        exit(401)
     } else {
-        # 拦截代理
+        # Intercept some proxy connections
         if req_header('x_forwarded_for') {
             add_rsp_header('X-Client-Block', 'Block Proxied Request')
-            exit(403)
+            exit(401)
         } else {
-            # 国家拦截
+            # Block None CN ip
             if ne(client_country(),'CN') {
                 add_rsp_header('X-Client-Block', 'Blocked Client Country')
-                exit(403)
+                exit(401)
             }
         }
     }
 }
 def block_easy() {
-    # ISP拦截
+    # Block some IDC's IP
     c_isp = tostring(client_isp())
     if not(or(eq('100025',c_isp), eq('100026',c_isp), eq('100017',c_isp))) {
-        exit(403)
+        exit(401)
     } else {
-        # 拦截代理
+        # Intercept some proxy connections
         if req_header('x_forwarded_for') {
-            exit(403)
+            exit(401)
         } else {
-            # 国家拦截
+            # Block None CN ip
             if ne(client_country(),'CN') {
-                exit(403)
+                exit(401)
             }
         }
     }
-}
-def block() {
-    # Main Blocl Func
-    if debug_mode {
-        block_details()
-    } else {
-        block_easy()
-    }
-    
 }
 ## ---------------------------FUNC END-----------------------------
 ## -----------------------------FUNC-------------------------------
 # Main Whitelist Func
 w = false
+c_ip = tostring(client_addr())
 def determine_wlt(k, v, u) {
     # Determine whether it's been already whitelist
-    if not(w) {
-        w = eq(v, client_addr())
+    if w {
+        # if debug_mode please use block_details()
+        block_easy()
+        return false
+    } else {
+        w = eq(v, c_ip)
     }
 }
 if allow_ip {
-    # Traverse the whitelist
     foreach(allow_ip, determine_wlt, [])
-    # While w == true then whitelisted, otherwise not whitelisted
-    if not(w) {
-        block()
-    } else {
-        add_rsp_header('X-Client-Whitelisted', 'true')
-    }
 }
 ## ---------------------------FUNC END-----------------------------
 ## -----------------------------FUNC-------------------------------
 # Fake IP Func
-if fake_ip {
-  add_req_header('x_forwarded_for', fake_ip)
-}
+# if fake_ip {
+#     add_req_header('x_forwarded_for', fake_ip)
+# }
 ## ---------------------------FUNC END-----------------------------
